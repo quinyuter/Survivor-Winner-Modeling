@@ -1,0 +1,93 @@
+---
+title: "SurvivorData"
+author: "Quin Yuter"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+## Importing Libraries
+library(survivoR)
+library(tidyverse)
+```
+
+Everything comes from https://github.com/doehm/survivoR  
+
+###Data
+```{r}
+## Gives limited cast information
+castaways_df <- data.frame(castaways)%>%
+  filter(version == "US")
+
+## Summary of each season
+season_summary_df <- data.frame(season_summary)%>%
+  filter(version == "US")
+
+## Where the votes went each episode
+votes <- data.frame(vote_history)%>%
+  filter(version == "US")
+
+## Gives more detailed cast information
+castaway_dets <- data.frame(castaway_details)
+
+## Confessional Count
+confessionals <- data.frame(confessionals) %>%
+  filter(version == "US")
+
+## How much screen time each castaway got
+screentime <- data.frame(screen_time)
+
+## Advantage details
+advantages <- data.frame(advantage_movement) %>%
+  filter(version == "US")
+```
+
+###Cleaning Data and manipulation
+```{r}
+
+## Taking initial data from the castaway df
+winners <- castaways_df %>%
+  filter(winner == TRUE) %>%
+  select(c(season, full_name, castaway_id, age, state))
+
+## Creating a vector and df of winner castaway IDs for ease
+winner_ids <- winners$castaway_id
+
+winner_df <- winners %>%
+  select(castaway_id, season)
+
+## Merging it with more castaway details using castaway_dets
+castaway_dets_selected <- castaway_dets %>%
+  select(c(castaway_id, gender, personality_type, occupation, three_words))
+
+winners <- merge(winners, castaway_dets_selected, by = "castaway_id")
+
+
+## Adding voting statistics
+votes_winners <- votes %>%
+  filter(castaway_id %in% winner_ids) %>%
+  mutate(correct = case_when(vote == voted_out ~ "YES", 
+                             vote != voted_out ~ "NO")) %>%
+  merge(winner_df, by = c("season", "castaway_id"))
+
+
+correct_votes <- votes_winners %>%
+  filter(!is.na(correct)) %>%
+  group_by(castaway_id, season, correct) %>%
+  summarize(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = correct, values_from = n, values_fill = list(n = 0)) %>%
+  mutate(vote_perc = YES/(YES + NO)) %>%
+  arrange(season) %>%
+  select(castaway_id, vote_perc)
+
+winners <- merge(winners, correct_votes, by = "castaway_id")
+
+
+  
+```
+
